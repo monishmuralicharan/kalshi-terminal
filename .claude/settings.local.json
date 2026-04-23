@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(redis-cli -u redis://localhost:6379 XPENDING news-raw nlp-workers - + 10)",
+      "Bash(redis-cli -u redis://localhost:6379 XPENDING news-raw nlp-workers)",
+      "Bash(redis-cli -u redis://localhost:6379 XRANGE news-enriched - + COUNT 3)",
+      "Bash(awk 'NR%3==0')",
+      "Bash(python3 -c ' *)"
+    ]
+  }
+}

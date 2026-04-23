@@ -1,0 +1,9 @@
+{
+  "name": "ingestion",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  }
+}

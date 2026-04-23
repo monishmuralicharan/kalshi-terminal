@@ -1,0 +1,15 @@
+export const feeds = [
+  { id: 'bbc-world',             url: 'https://feeds.bbci.co.uk/news/world/rss.xml',                                         category: 'world',      pollIntervalMs: 60_000  },
+  { id: 'bbc-tech',              url: 'https://feeds.bbci.co.uk/news/technology/rss.xml',                                    category: 'technology', pollIntervalMs: 60_000  },
+  { id: 'bbc-business',          url: 'https://feeds.bbci.co.uk/news/business/rss.xml',                                      category: 'finance',    pollIntervalMs: 60_000  },
+  { id: 'yahoo-finance-tickers', url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=yhoo,goog&region=US&lang=en-US',   category: 'finance',    pollIntervalMs: 30_000  },
+  { id: 'yahoo-finance',         url: 'https://finance.yahoo.com/news/rssindex',                                             category: 'finance',    pollIntervalMs: 30_000  },
+  { id: 'google-news-tech',      url: 'https://news.google.com/rss/search?q=technology',                                     category: 'technology', pollIntervalMs: 30_000  },
+  { id: 'google-news-finance',   url: 'https://news.google.com/rss/search?q=finance',                                        category: 'finance',    pollIntervalMs: 30_000  },
+  { id: 'guardian-world',        url: 'https://www.theguardian.com/world/rss',                                               category: 'world',      pollIntervalMs: 60_000  },
+  { id: 'guardian-tech',         url: 'https://www.theguardian.com/technology/rss',                                          category: 'technology', pollIntervalMs: 60_000  },
+  { id: 'nyt-world',             url: 'https://rss.nytimes.com/services/xml/rss/nyt/World.xml',                              category: 'world',      pollIntervalMs: 120_000 },
+  { id: 'nyt-tech',              url: 'https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml',                         category: 'technology', pollIntervalMs: 120_000 },
+  { id: 'npr-news',              url: 'https://feeds.npr.org/1001/rss.xml',                                                  category: 'world',      pollIntervalMs: 120_000 },
+  { id: 'techcrunch',            url: 'https://techcrunch.com/feed/',                                                        category: 'technology', pollIntervalMs: 60_000  },
+]
