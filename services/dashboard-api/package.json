@@ -1,0 +1,10 @@
+{
+  "name": "dashboard-api",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node --test test"
+  }
+}
