@@ -65,6 +65,29 @@ const reconciler = createOrderbookReconciler({
 })
 const health = createHealth({ fallbackController: fallback, wsStateRef })
 
+const STATUS_KEY = 'kalshi-terminal:market-data:status'
+let lastWsMessageAt = null
+let lastError = null
+
+async function publishMarketDataStatus() {
+  try {
+    const body = JSON.stringify({
+      ws_state: wsStateRef.current,
+      fallback_mode: fallback.mode(),
+      last_ws_message_at: lastWsMessageAt,
+      tickers_count: MARKET_TICKERS.length,
+      last_error: lastError,
+      ts: new Date().toISOString(),
+    })
+    await redis.set(STATUS_KEY, body, 'EX', 120)
+  } catch (err) {
+    log({ event: 'status_publish_error', error: err.message })
+  }
+}
+
+const statusTimer = setInterval(publishMarketDataStatus, 5000)
+statusTimer.unref()
+
 async function handleEvent(canonicalEvent) {
   validateCanonicalEvent(canonicalEvent)
   const { accepted } = reconciler.reconcile(canonicalEvent)
@@ -79,6 +102,35 @@ async function handleEvent(canonicalEvent) {
   metrics.inc(`event_${canonicalEvent.type}`)
   metrics.setGauge(`market_lag_ms_${canonicalEvent.meta.market_ticker}`, Date.now() - Date.parse(canonicalEvent.meta.provider_ts))
 }
+
+async function bootstrapSnapshots() {
+  if (!MARKET_TICKERS.length) return
+  const t0 = Date.now()
+  try {
+    const events = await poller.pollAll()
+    let ingested = 0
+    for (const event of events) {
+      try {
+        await handleEvent(event)
+        ingested++
+      } catch (err) {
+        metrics.inc('bootstrap_errors')
+        log({ event: 'bootstrap_item_error', error: err.message, ticker: event?.meta?.market_ticker })
+      }
+    }
+    log({
+      event: 'bootstrap_complete',
+      fetched: events.length,
+      ingested,
+      duration_ms: Date.now() - t0,
+    })
+  } catch (error) {
+    log({ event: 'bootstrap_error', error: error.message, duration_ms: Date.now() - t0 })
+  }
+}
+
+await bootstrapSnapshots()
+await publishMarketDataStatus()
 
 let running = true
 let wsClient
@@ -97,9 +149,12 @@ if (KALSHI_WS_URL && MARKET_TICKERS.length) {
         const raw = JSON.parse(data)
         const canonical = normalizeKalshiEvent(raw, { source: 'ws' })
         await handleEvent(canonical)
+        lastWsMessageAt = new Date().toISOString()
+        lastError = null
         fallback.markWsUpdate()
       } catch (error) {
         metrics.inc('ws_parse_errors')
+        lastError = error.message
         log({ event: 'ws_message_error', error: error.message })
       }
     },
@@ -134,6 +189,7 @@ const shutdown = async (signal) => {
   log({ event: 'shutdown_start', signal })
   wsClient?.stop()
   clearInterval(reportTimer)
+  clearInterval(statusTimer)
   await redis.quit()
   await pool.end()
   log({ event: 'shutdown_complete' })

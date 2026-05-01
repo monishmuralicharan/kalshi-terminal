@@ -49,6 +49,34 @@ node services/market-data/index.js
 node services/dashboard-api/index.js
 ```
 
+### Dashboard dev (Vite + API proxy)
+
+1. Start `dashboard-api` on port `4010` (default).
+2. From `apps/dashboard`, run `npm run dev`.
+3. The UI calls `/api/...`; Vite proxies that to the API (see `apps/dashboard/vite.config.js`). Override proxy target with `VITE_PROXY_TARGET` if needed.
+4. Stack console (no Vite): open `http://localhost:4010/console` while `dashboard-api` is running.
+
+### Docker Compose (Redis + services)
+
+```
+docker compose up --build
+```
+
+Set `REDIS_URL=redis://redis:6379` in `.env` for container networking (compose overrides `REDIS_URL` per service). Open `http://localhost:4010/console` for a single-page ops view (`/health/*`, `/stack-status`, `/config`).
+
+### Single port (UI + API + console)
+
+Build the dashboard, then start `dashboard-api` only (after `market-data` has populated the DB, or run both):
+
+```
+cd apps/dashboard && npm run build && cd ../..
+node services/dashboard-api/index.js
+```
+
+- UI: `http://localhost:4010/`
+- Ops console: `http://localhost:4010/console`
+- Remote viewing: tunnel port `4010` (for example `ngrok http 4010`) so one URL exposes UI, REST, SSE, and `/console`.
+
 ### Notes
 
 - Supabase direct and pooler endpoints are both supported as long as credentials are valid.

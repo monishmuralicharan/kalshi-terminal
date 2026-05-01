@@ -9,20 +9,26 @@ import { buildPgPoolConfig, getDbConfigInfo } from '../common/db/pg-config.js'
 import { createBookStore } from '../market-data/src/state/book-store.js'
 import { createMarketRoutes } from './src/routes/markets.js'
 import { createLiveStream } from './src/stream/live-stream.js'
+import { buildStackStatus, buildPublicConfig } from './src/stack-status.js'
+import { getConsolePageHtml } from './src/console-page.js'
+import { createDistStaticHandler } from './src/static-dist.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 config({ path: resolve(__dirname, '../../.env') })
 
 const REDIS_URL = process.env.REDIS_URL ?? 'redis://localhost:6379'
 const PORT = Number(process.env.DASHBOARD_API_PORT ?? 4010)
+const DIST_ROOT = resolve(__dirname, '../../apps/dashboard/dist')
 
 const pool = new pg.Pool(buildPgPoolConfig(process.env))
+const redisCmd = new IORedis(REDIS_URL)
 
 const cache = createBookStore()
 const redisSub = new IORedis(REDIS_URL)
 const clients = new Set()
 const liveStream = createLiveStream({ redisSub, clients })
 const routes = createMarketRoutes({ pool, cache })
+const tryServeDist = createDistStaticHandler(DIST_ROOT)
 
 await liveStream.start()
 
@@ -53,6 +59,29 @@ const server = createServer(async (req, res) => {
   if (req.method === 'GET' && url.pathname === '/health/ready') {
     res.writeHead(200, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({ ok: true, clients: clients.size, ts: new Date().toISOString() }))
+    return
+  }
+
+  if (req.method === 'GET' && url.pathname === '/stack-status') {
+    const body = await buildStackStatus({
+      pool,
+      redisCmd,
+      sseClientsSize: clients.size,
+    })
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify(body))
+    return
+  }
+
+  if (req.method === 'GET' && url.pathname === '/config') {
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify(buildPublicConfig()))
+    return
+  }
+
+  if (req.method === 'GET' && url.pathname === '/console') {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+    res.end(getConsolePageHtml())
     return
   }
 
@@ -97,9 +126,31 @@ const server = createServer(async (req, res) => {
     return
   }
 
+  if (await tryServeDist(req, res, url)) return
+
   res.writeHead(404, { 'Content-Type': 'application/json' })
   res.end(JSON.stringify({ error: 'not_found' }))
 })
+
+const shutdown = async (signal) => {
+  console.log(JSON.stringify({ ts: new Date().toISOString(), service: 'dashboard-api', event: 'shutdown_start', signal }))
+  await new Promise((resolve) => {
+    server.close(() => resolve())
+  })
+  try {
+    await redisCmd.quit()
+  } catch {}
+  try {
+    await redisSub.quit()
+  } catch {}
+  try {
+    await pool.end()
+  } catch {}
+  process.exit(0)
+}
+
+process.on('SIGINT', () => shutdown('SIGINT'))
+process.on('SIGTERM', () => shutdown('SIGTERM'))
 
 server.listen(PORT, () => {
   console.log(
