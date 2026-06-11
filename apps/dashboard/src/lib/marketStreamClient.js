@@ -29,6 +29,30 @@ export function createMarketStreamClient(opts = {}) {
     return res.json()
   }
 
+  async function fetchAnomalies({ since, signalType, limit = 50 } = {}) {
+    const params = new URLSearchParams()
+    if (since) params.set('since', since)
+    if (signalType) params.set('signal_type', signalType)
+    if (limit != null) params.set('limit', String(limit))
+    const qs = params.toString()
+    const res = await fetch(`${apiBaseUrl}/anomalies${qs ? `?${qs}` : ''}`)
+    if (!res.ok) throw new Error(`anomalies request failed: ${res.status}`)
+    const body = await res.json()
+    return body.anomalies ?? []
+  }
+
+  async function fetchAnomaliesForMarket(marketId, { limit = 50 } = {}) {
+    const params = new URLSearchParams()
+    if (limit != null) params.set('limit', String(limit))
+    const qs = params.toString()
+    const res = await fetch(
+      `${apiBaseUrl}/anomalies/${encodeURIComponent(marketId)}${qs ? `?${qs}` : ''}`,
+    )
+    if (!res.ok) throw new Error(`anomalies request failed: ${res.status}`)
+    const body = await res.json()
+    return body.anomalies ?? []
+  }
+
   function connect(onEvent) {
     const source = new EventSource(`${apiBaseUrl}/stream`)
     source.onmessage = (message) => {
@@ -50,5 +74,12 @@ export function createMarketStreamClient(opts = {}) {
     return () => source.close()
   }
 
-  return { fetchMarkets, fetchSnapshot, fetchStackStatus, connect }
+  return {
+    fetchMarkets,
+    fetchSnapshot,
+    fetchStackStatus,
+    fetchAnomalies,
+    fetchAnomaliesForMarket,
+    connect,
+  }
 }

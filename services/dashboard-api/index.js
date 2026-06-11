@@ -87,7 +87,7 @@ const server = createServer(async (req, res) => {
     return
   }
 
-  if (req.method === 'GET' && url.pathname === '/api/anomalies') {
+  if (req.method === 'GET' && url.pathname === '/anomalies') {
     const since = url.searchParams.get('since') || undefined
     const signalType = url.searchParams.get('signal_type') || undefined
     const limit = Number(url.searchParams.get('limit') ?? 100)
@@ -97,8 +97,8 @@ const server = createServer(async (req, res) => {
     return
   }
 
-  if (req.method === 'GET' && url.pathname.startsWith('/api/anomalies/')) {
-    const marketId = decodeURIComponent(url.pathname.split('/').slice(3).join('/') || '')
+  if (req.method === 'GET' && url.pathname.startsWith('/anomalies/')) {
+    const marketId = decodeURIComponent(url.pathname.split('/').slice(2).join('/') || '')
     if (!marketId) {
       res.writeHead(400, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ error: 'market_id required' }))

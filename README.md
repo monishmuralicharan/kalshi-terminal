@@ -91,8 +91,8 @@ NEWS_BUFFER_MINUTES=15
 ### Anomalies API
 
 ```
-GET /api/anomalies?since=<iso>&signal_type=<type>&limit=100
-GET /api/anomalies/<market_id>?limit=100
+GET /anomalies?since=<iso>&signal_type=<type>&limit=100
+GET /anomalies/<market_id>?limit=100
 ```
 
 Signal types: `volume_spike`, `price_no_news`, `trade_cluster`, `rapid_resolution`, `pin_elevated`.

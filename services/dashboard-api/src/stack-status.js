@@ -40,6 +40,16 @@ export async function buildStackStatus({ pool, redisCmd, sseClientsSize, env = p
     recentEventCount = 0
   }
 
+  let anomalyCount24h = null
+  try {
+    const res = await pool.query(
+      `SELECT count(*)::int AS c FROM anomalies WHERE detected_at > now() - interval '24 hours'`,
+    )
+    anomalyCount24h = res.rows[0]?.c ?? 0
+  } catch {
+    anomalyCount24h = null
+  }
+
   return {
     ts: new Date().toISOString(),
     pg_ok: pgOk,
@@ -47,6 +57,7 @@ export async function buildStackStatus({ pool, redisCmd, sseClientsSize, env = p
     sse_clients: sseClientsSize,
     market_data: marketData,
     recent_event_count: recentEventCount,
+    anomaly_count_24h: anomalyCount24h,
     configured_tickers: configuredTickers,
   }
 }

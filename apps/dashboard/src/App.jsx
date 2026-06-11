@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { AnomaliesPanel } from './components/AnomaliesPanel.jsx'
 import { OrderbookLadder } from './components/OrderbookLadder.jsx'
 import { TapeHealthStrip } from './components/TapeHealthStrip.jsx'
 import { createMarketStreamClient } from './lib/marketStreamClient.js'
@@ -17,14 +18,37 @@ function connectionLabel(connection) {
   return 'Connecting'
 }
 
+function since24hIso() {
+  return new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+}
+
 export function App() {
   const client = useMemo(() => createMarketStreamClient({}), [])
   const [connection, setConnection] = useState('connecting')
   const [markets, setMarkets] = useState([])
+  const [extraMarkets, setExtraMarkets] = useState([])
   const [selected, setSelected] = useState('')
   const [snapshot, setSnapshot] = useState(null)
   const [stackStatus, setStackStatus] = useState(null)
   const [lastSseAt, setLastSseAt] = useState(null)
+  const [anomalies, setAnomalies] = useState([])
+  const [anomaliesLoading, setAnomaliesLoading] = useState(false)
+  const [anomaliesError, setAnomaliesError] = useState(null)
+  const [anomaliesRefreshedAt, setAnomaliesRefreshedAt] = useState(null)
+  const [signalFilter, setSignalFilter] = useState('')
+  const [anomalyScope, setAnomalyScope] = useState('all')
+
+  const marketOptions = useMemo(() => {
+    const seen = new Set()
+    const merged = []
+    for (const t of [...markets, ...extraMarkets]) {
+      if (t && !seen.has(t)) {
+        seen.add(t)
+        merged.push(t)
+      }
+    }
+    return merged.sort()
+  }, [markets, extraMarkets])
 
   useEffect(() => {
     let cancelled = false
@@ -45,6 +69,48 @@ export function App() {
       clearInterval(id)
     }
   }, [client])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadAnomalies = async () => {
+      setAnomaliesLoading(true)
+      setAnomaliesError(null)
+      try {
+        let rows
+        if (anomalyScope === 'selected' && selected) {
+          rows = await client.fetchAnomaliesForMarket(selected, { limit: 50 })
+          if (signalFilter) {
+            rows = rows.filter((r) => r.signal_type === signalFilter)
+          }
+        } else {
+          rows = await client.fetchAnomalies({
+            since: since24hIso(),
+            signalType: signalFilter || undefined,
+            limit: 50,
+          })
+        }
+        if (!cancelled) {
+          setAnomalies(rows)
+          setAnomaliesRefreshedAt(new Date().toISOString())
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setAnomaliesError(err.message)
+          setAnomalies([])
+        }
+      } finally {
+        if (!cancelled) setAnomaliesLoading(false)
+      }
+    }
+
+    loadAnomalies()
+    const id = setInterval(loadAnomalies, 30_000)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+    }
+  }, [client, anomalyScope, selected, signalFilter])
 
   useEffect(() => {
     let mounted = true
@@ -95,6 +161,16 @@ export function App() {
       .catch(() => setConnection('poll_fallback'))
   }, [client, selected])
 
+  const handleSelectMarket = useCallback(
+    (marketId) => {
+      setSelected(marketId)
+      if (marketId && !markets.includes(marketId) && !extraMarkets.includes(marketId)) {
+        setExtraMarkets((prev) => [...prev, marketId])
+      }
+    },
+    [markets, extraMarkets],
+  )
+
   const consoleHref = import.meta.env.DEV
     ? `${import.meta.env.VITE_DASHBOARD_CONSOLE_ORIGIN ?? 'http://127.0.0.1:4010'}/console`
     : '/console'
@@ -104,7 +180,7 @@ export function App() {
       <header className="app-header">
         <div className="app-title-block">
           <h1>Kalshi Terminal</h1>
-          <p>Live orderbook and tape health for tracked markets.</p>
+          <p>Live orderbook, tape health, and anomaly alerts.</p>
         </div>
         <div className={connectionBadgeClass(connection)} title="Feed state">
           <span className="dot" aria-hidden />
@@ -124,10 +200,10 @@ export function App() {
             className="market-select"
             value={selected}
             onChange={(e) => setSelected(e.target.value)}
-            disabled={!markets.length}
+            disabled={!marketOptions.length}
           >
-            {!markets.length ? <option value="">No markets yet</option> : null}
-            {markets.map((ticker) => (
+            {!marketOptions.length ? <option value="">No markets yet</option> : null}
+            {marketOptions.map((ticker) => (
               <option key={ticker} value={ticker}>
                 {ticker}
               </option>
@@ -144,6 +220,19 @@ export function App() {
       </div>
 
       <OrderbookLadder snapshot={snapshot} />
+
+      <AnomaliesPanel
+        anomalies={anomalies}
+        loading={anomaliesLoading}
+        error={anomaliesError}
+        selectedMarket={selected}
+        signalFilter={signalFilter}
+        onSignalFilterChange={setSignalFilter}
+        scopeFilter={anomalyScope}
+        onScopeFilterChange={setAnomalyScope}
+        onSelectMarket={handleSelectMarket}
+        lastRefreshedAt={anomaliesRefreshedAt}
+      />
     </div>
   )
 }

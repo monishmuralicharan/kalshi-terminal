@@ -44,6 +44,11 @@ export function TapeHealthStrip({ stackStatus, lastSseAt, snapshot }) {
       <Stat label="Book source" value={String(src)} />
       <Stat label="Book updated" value={fmtAge(updated)} />
       <Stat label="Events / min" value={String(stackStatus?.recent_event_count ?? '—')} />
+      <Stat
+        label="Anomalies (24h)"
+        value={stackStatus?.anomaly_count_24h != null ? String(stackStatus.anomaly_count_24h) : '—'}
+        valueClass={stackStatus?.anomaly_count_24h > 0 ? 'bad' : ''}
+      />
       {md?.last_error ? (
         <Stat label="Ingest error" value={md.last_error} valueClass="bad" wide />
       ) : null}
