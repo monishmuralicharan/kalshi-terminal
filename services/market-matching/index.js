@@ -13,6 +13,7 @@ const { createEmbedder } = await import('./src/matching/embedder.js')
 const { createRuleEngine } = await import('./src/matching/rule-engine.js')
 const { createVectorSearch } = await import('./src/matching/vector-search.js')
 const { createMarketSync } = await import('./src/sync/market-sync.js')
+const { createTradePoller } = await import('./src/sync/trade-poller.js')
 const { createPublisher } = await import('./src/publisher.js')
 const { ensureGroup, createConsumer, createMatcher } = await import('./src/consumer.js')
 
@@ -59,6 +60,7 @@ const sync = createMarketSync({
   maxPages: SYNC_MAX_PAGES,
   categories: SYNC_CATEGORIES,
 })
+const tradePoller = createTradePoller({ pool })
 const publisher = createPublisher({ pool, redis, channel: CHANNEL })
 const matcher = createMatcher({ ruleEngine, vectorSearch, embedder })
 
@@ -72,6 +74,7 @@ const consumer = createConsumer({
 const shutdown = async (signal) => {
   log({ event: 'shutdown_start', signal })
   sync.stop()
+  tradePoller.stop()
   consumer.stop()
   setTimeout(async () => {
     try { await redis.quit() } catch {}
@@ -84,4 +87,4 @@ process.on('SIGINT', () => shutdown('SIGINT'))
 process.on('SIGTERM', () => shutdown('SIGTERM'))
 
 log({ event: 'market_matching_started', threshold: THRESHOLD, sync_interval_ms: SYNC_INTERVAL_MS })
-await Promise.all([sync.loop(), consumer.run()])
+await Promise.all([sync.loop(), consumer.run(), tradePoller.pollLoop()])

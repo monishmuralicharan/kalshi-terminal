@@ -8,6 +8,7 @@ import { buildPgPoolConfig, getDbConfigInfo } from '../common/db/pg-config.js'
 
 import { createBookStore } from '../market-data/src/state/book-store.js'
 import { createMarketRoutes } from './src/routes/markets.js'
+import { createAnomalyRoutes } from './src/routes/anomalies.js'
 import { createLiveStream } from './src/stream/live-stream.js'
 import { buildStackStatus, buildPublicConfig } from './src/stack-status.js'
 import { getConsolePageHtml } from './src/console-page.js'
@@ -28,6 +29,7 @@ const redisSub = new IORedis(REDIS_URL)
 const clients = new Set()
 const liveStream = createLiveStream({ redisSub, clients })
 const routes = createMarketRoutes({ pool, cache })
+const anomalyRoutes = createAnomalyRoutes({ pool })
 const tryServeDist = createDistStaticHandler(DIST_ROOT)
 
 await liveStream.start()
@@ -82,6 +84,30 @@ const server = createServer(async (req, res) => {
   if (req.method === 'GET' && url.pathname === '/console') {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
     res.end(getConsolePageHtml())
+    return
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/anomalies') {
+    const since = url.searchParams.get('since') || undefined
+    const signalType = url.searchParams.get('signal_type') || undefined
+    const limit = Number(url.searchParams.get('limit') ?? 100)
+    const anomalies = await anomalyRoutes.listAnomalies({ since, signalType, limit })
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ anomalies }))
+    return
+  }
+
+  if (req.method === 'GET' && url.pathname.startsWith('/api/anomalies/')) {
+    const marketId = decodeURIComponent(url.pathname.split('/').slice(3).join('/') || '')
+    if (!marketId) {
+      res.writeHead(400, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ error: 'market_id required' }))
+      return
+    }
+    const limit = Number(url.searchParams.get('limit') ?? 100)
+    const anomalies = await anomalyRoutes.listByMarket(marketId, { limit })
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ market_id: marketId, anomalies }))
     return
   }
 
