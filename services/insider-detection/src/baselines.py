@@ -41,7 +41,7 @@ class BaselineRefresher:
                         (EXTRACT(DOW FROM time AT TIME ZONE 'UTC')::int * 24
                          + EXTRACT(HOUR FROM time AT TIME ZONE 'UTC')::int) AS hour_of_week,
                         DATE(time AT TIME ZONE 'UTC') AS trade_day,
-                        time_bucket('5 minutes', time) AS bucket,
+                        date_bin('5 minutes', time, TIMESTAMPTZ '2000-01-01') AS bucket,
                         COUNT(*) AS bucket_trade_count
                       FROM trades
                       WHERE time >= %s
